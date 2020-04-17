@@ -12,64 +12,10 @@
 
 'use strict';
 
-var Promise = require('@adobe/reactor-promise');
 var decorateCode = require('./decorateCode');
-var deferredPromise = require('./deferredPromise');
-
-var callbackId = 0;
-var deferredPromises = {};
-
-window._satellite = window._satellite || {};
-
-/**
- * Public function intended to be called by the user.
- * @param {number} callbackId The identifier passed to _satellite._onCustomCodeSuccess().
- */
-window._satellite._onCustomCodeSuccess = function(callbackId) {
-  var promiseHandlers = deferredPromises[callbackId];
-  if (!promiseHandlers) {
-    return;
-  }
-
-  promiseHandlers.resolve();
-};
-
-/**
- * Public function intended to be called by the user.
- * @param {number} callbackId The identifier passed to _satellite._onCustomCodeSuccess().
- */
-window._satellite._onCustomCodeFailure = function(callbackId) {
-  var promiseHandlers = deferredPromises[callbackId];
-  if (!promiseHandlers) {
-    return;
-  }
-
-  promiseHandlers.reject();
-};
-
-var reactorCallbackIdShouldBeReplaced = function(source) {
-  return source.indexOf('${reactorCallbackId}') !== -1;
-};
-
-var replaceCallbacksIds = function(source, callbackId) {
-  return source.replace(/\${reactorCallbackId}/g, callbackId);
-};
-
-var shouldActionBeMarkedAsComplete = function(action) {
-  return action.settings.language === 'javascript' && action.settings.global;
-};
 
 module.exports = function(action, source, writeFn) {
-  var p = deferredPromise();
-  source = decorateCode(action, source, p);
-
-  if (reactorCallbackIdShouldBeReplaced(source)) {
-    deferredPromises[callbackId] = p;
-    source = replaceCallbacksIds(source, callbackId);
-
-    callbackId += 1;
-  }
-
-  writeFn(source);
-  return shouldActionBeMarkedAsComplete(action) ? Promise.resolve() : p.promise;
+  var result = decorateCode(action, source);
+  writeFn(result.code);
+  return result.promise;
 };
